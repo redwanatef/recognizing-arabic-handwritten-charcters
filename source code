@@ -1,0 +1,120 @@
+#import libraries
+
+import numpy as np
+import pandas as pd
+import tensorflow
+import os
+import cv2
+from PIL import Image
+import glob as gb
+from tensorflow.keras import layers, models
+from sklearn.model_selection import train_test_split
+from sklearn.utils import shuffle
+from keras.utils import np_utils
+import matplotlib.pyplot as plt
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import MaxPooling2D, Conv2D, MaxPool2D, Dense, Flatten, Input, BatchNormalization, Dropout
+
+
+#data preprocessing
+
+x_train = pd.read_csv("C:\\Users\\رضوان احمد\\Downloads\Arabic Handwritten Characters Dataset CSV\\csvTrainImages 13440x1024.csv",header=None).to_numpy()
+y_train = pd.read_csv("C:\\Users\\رضوان احمد\\Downloads\Arabic Handwritten Characters Dataset CSV\\csvTrainLabel 13440x1.csv",header=None).to_numpy()-1 
+
+x_test = pd.read_csv("C:\\Users\\رضوان احمد\\Downloads\Arabic Handwritten Characters Dataset CSV\\csvTestImages 3360x1024.csv",header=None).to_numpy()
+y_test = pd.read_csv("C:\\Users\\رضوان احمد\\Downloads\Arabic Handwritten Characters Dataset CSV\\csvTestLabel 3360x1.csv",header=None).to_numpy()-1
+
+print("x_train.shape =", x_train.shape)
+print("y_train.shape =", y_train.shape)
+print("x_test.shape =", x_test.shape)
+print("y_test.shape =", y_test.shape)
+
+x_train = x_train.reshape(-1,32,32)
+x_test = x_test.reshape(-1,32,32)
+x_train = x_train/255
+x_test = x_test/255
+# for some reason the images are flipped and rotated
+# so we transpose each image to be in the correct shape
+x_train = np.array([image.T for image in x_train])
+x_test = np.array([image.T for image in x_test])
+
+# shuffle
+x_train, y_train = shuffle(x_train, y_train)
+x_test, y_test = shuffle(x_test, y_test)
+
+print(x_train.shape, x_test.shape)
+
+y_train = y_train.reshape(-1)
+y_test = y_test.reshape(-1)
+
+y_train_h = to_categorical(y_train)
+y_test_h = to_categorical(y_test)
+
+print(y_train.shape, y_test.shape)
+print(y_train_h.shape, y_test_h.shape)
+
+x_train = x_train.reshape(-1,32,32, 1)
+x_test = x_test.reshape(-1,32,32, 1)
+
+train_datagen=ImageDataGenerator(
+    #rescale=1/255, # Normalize the new images
+    zoom_range=0.2, #the amount of zooming u need
+    width_shift_range=0.10, # The percentage of Width shifitning
+    height_shift_range=0.10, # The percentage of height shifitning
+    shear_range=0.1, #Shear angle in counter-clockwise direction in degrees
+    fill_mode='nearest',
+    rotation_range=20, 
+)
+train_generator=train_datagen.flow(
+    x_train ,y_train ,batch_size=64
+)
+
+test_datagen=ImageDataGenerator()
+test_generator=test_datagen.flow(
+    x_test ,y_test ,batch_size=64
+ 
+)
+
+earlystop = EarlyStopping(patience=6)
+learning_rate_reduction=ReduceLROnPlateau(
+    monitor='val_acc',
+    patience= 3,
+    verbose=1,
+)
+callbacks = [earlystop, learning_rate_reduction]
+print(learning_rate_reduction.monitor)
+
+#plot random sample
+
+ra = np.random.randint(0, 13440, size=25)
+plt.figure(figsize=(10,10))
+for i in range(25):
+    plt.subplot(5,5,i+1)
+    plt.xticks([])
+    plt.yticks([])
+    plt.imshow(x_train[ra[i]].reshape(32,32),"gray")
+    plt.title(arabic_chars[int(y_train[ra[i]][0])], fontsize = 20)
+plt.show()
+
+#training data
+
+model=Sequential() 
+
+model.add(Conv2D(80,(5,5),activation='relu',input_shape=(32,32,1)))
+model.add(MaxPooling2D(2,2))
+model.add(Conv2D(64,(5,5),activation='relu'))
+model.add(MaxPooling2D(2,2))
+model.add(Flatten())
+model.add(Dense(1024,activation='relu', name='featurs'))
+#model.add(Dropout(0.5))
+model.add(Dense(28, kernel_regularizer=l2(0.01) ,activation='softmax'))
+
+model.compile(optimizer= 'adam' ,loss='sparse_categorical_crossentropy',metrics=['accuracy'])
+
+model.fit(
+    train_generator, 
+    epochs=20,
+    validation_data=test_generator,
+    callbacks=callbacks
+)
