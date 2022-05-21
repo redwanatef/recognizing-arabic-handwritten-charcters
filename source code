@@ -11,11 +11,13 @@ from tensorflow.keras import layers, models
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 from keras.utils import np_utils
+from keras.utils.np_utils import to_categorical
 import matplotlib.pyplot as plt
+from tensorflow.keras.regularizers import l2
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.callbacks import EarlyStopping,ReduceLROnPlateau
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import MaxPooling2D, Conv2D, MaxPool2D, Dense, Flatten, Input, BatchNormalization, Dropout
-
 
 #data preprocessing
 
@@ -34,8 +36,6 @@ x_train = x_train.reshape(-1,32,32)
 x_test = x_test.reshape(-1,32,32)
 x_train = x_train/255
 x_test = x_test/255
-# for some reason the images are flipped and rotated
-# so we transpose each image to be in the correct shape
 x_train = np.array([image.T for image in x_train])
 x_test = np.array([image.T for image in x_test])
 
@@ -58,7 +58,6 @@ x_train = x_train.reshape(-1,32,32, 1)
 x_test = x_test.reshape(-1,32,32, 1)
 
 train_datagen=ImageDataGenerator(
-    #rescale=1/255, # Normalize the new images
     zoom_range=0.2, #the amount of zooming u need
     width_shift_range=0.10, # The percentage of Width shifitning
     height_shift_range=0.10, # The percentage of height shifitning
@@ -78,7 +77,6 @@ test_generator=test_datagen.flow(
 
 earlystop = EarlyStopping(patience=6)
 learning_rate_reduction=ReduceLROnPlateau(
-    monitor='val_acc',
     patience= 3,
     verbose=1,
 )
@@ -118,3 +116,15 @@ model.fit(
     validation_data=test_generator,
     callbacks=callbacks
 )
+
+#some visualisations
+
+losses = pd.DataFrame(model.history.history)
+losses[['accuracy','val_accuracy']].plot()
+losses[['loss','val_loss']].plot()
+
+#model prediction
+pred = model.predict(x_test)
+print(pred.shape)
+pred = np.argmax(pred, axis=1)
+print(pred)
